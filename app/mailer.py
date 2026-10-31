@@ -63,16 +63,11 @@ def send_digest(articles: list[dict[str, Any]]) -> DigestResult:
                 time.sleep(SEND_INTERVAL_SECONDS)
             started = time.perf_counter()
             ok = False
-            payload: dict[str, Any] = {
-                "from": settings.email_from,
-                "to": [email],
-                "subject": subject,
-                "html": html,
-            }
-            if settings.email_reply_to:
-                payload["reply_to"] = settings.email_reply_to
             try:
-                response = client.post(RESEND_URL, json=payload)
+                response = client.post(
+                    RESEND_URL,
+                    json={"from": settings.email_from, "to": [email], "subject": subject, "html": html},
+                )
                 if response.is_error:
                     logger.error(
                         "Invio fallito verso %s: %s %s", email, response.status_code, response.text

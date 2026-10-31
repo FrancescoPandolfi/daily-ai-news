@@ -95,8 +95,6 @@ Quando è attiva, dal pulsante **Destinatari** in alto a destra aggiungi o rimuo
 - `EMAIL_TO` nel `.env` serve solo a inizializzare l'elenco al primo avvio; dopo vale l'elenco nell'app.
 - Con il mittente di prova `onboarding@resend.dev`, Resend consegna **solo all'indirizzo con cui ti sei
   registrato**: per inviare ad altre persone devi verificare un dominio su Resend e impostare `EMAIL_FROM`.
-- `EMAIL_REPLY_TO` (opzionale) è l'indirizzo a cui arrivano le risposte al digest: senza, chi risponde
-  scrive al mittente del dominio e la risposta si perde.
 
 ## Risposte in streaming
 
