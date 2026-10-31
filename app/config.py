@@ -34,6 +34,7 @@ class Settings:
     resend_api_key: str
     email_to: str
     email_from: str
+    email_reply_to: str
     recipients_ui: bool
 
     base_url: str
@@ -68,6 +69,7 @@ def get_settings() -> Settings:
         resend_api_key=_optional("RESEND_API_KEY"),
         email_to=_optional("EMAIL_TO"),
         email_from=_optional("EMAIL_FROM", "Daily AI News <onboarding@resend.dev>"),
+        email_reply_to=_optional("EMAIL_REPLY_TO"),
         recipients_ui=_flag("RECIPIENTS_UI"),
         base_url=_optional("BASE_URL", "http://localhost:8000").rstrip("/"),
         topics=topics,
