@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Accesso · Daily AI News{% endblock %}
+{% block content %}
+<div style="max-width: 340px; margin: 18vh auto 0;">
+  <h1 style="font-size: 1.4rem;">Daily AI News</h1>
+  {% if error %}<div class="card error">{{ error }}</div>{% endif %}
+  <form method="post" action="/login" class="card">
+    <div class="row">
+      <input type="password" name="password" placeholder="Password" autofocus required style="flex: 1 1 100%;">
+      <button class="primary" type="submit" style="flex: 1 1 100%;">Entra</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% if flash %}<div class="card flash">{{ flash }}</div>{% endif %}
+
+<h2>Chiedi all'archivio</h2>
+<form method="post" action="/ask" class="card" onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Cerco…';">
+  <div class="row">
+    <input type="text" name="question" value="{{ question }}" maxlength="500"
+           placeholder="Es. Cosa è successo di recente sull'AI Act?" required>
+    <select name="topic">
+      <option value="">Tutti gli argomenti</option>
+      {% for t in topics %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+    </select>
+    <select name="days">
+      <option value="0" {{ 'selected' if days == 0 }}>Tutto il periodo</option>
+      <option value="7" {{ 'selected' if days == 7 }}>Ultimi 7 giorni</option>
+      <option value="30" {{ 'selected' if days == 30 }}>Ultimi 30 giorni</option>
+      <option value="90" {{ 'selected' if days == 90 }}>Ultimi 90 giorni</option>
+    </select>
+    <button class="primary" type="submit">Chiedi</button>
+  </div>
+</form>
+
+{% if error %}<div class="card error">{{ error }}</div>{% endif %}
+
+{% if result %}
+<div class="card">
+  <div class="answer">{{ result.answer }}</div>
+  {% if result.sources %}
+  <ol class="sources muted" style="list-style: none; padding-left: 0;">
+    {% for s in result.sources %}
+    <li>[{{ s.n }}] <a href="{{ s.url }}" target="_blank" rel="noopener noreferrer">{{ s.title }}</a>
+      · {{ s.date }} · {{ s.topic }}</li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+</div>
+{% endif %}
+
+<h2>Archivio</h2>
+<div class="chips">
+  <a href="/" class="{{ 'active' if not selected_topic }}">Tutti</a>
+  {% for t in topics %}
+  <a href="/?topic={{ t | urlencode }}" class="{{ 'active' if t == selected_topic }}">{{ t }}</a>
+  {% endfor %}
+</div>
+
+{% for a in articles %}
+<div class="card">
+  <a href="{{ a.url }}" target="_blank" rel="noopener noreferrer"><strong>{{ a.title }}</strong></a>
+  <div class="muted">{{ (a.published_at or a.created_at)[:10] }} · {{ a.topic }}</div>
+  <p style="margin: .5rem 0 0;">{{ a.summary }}</p>
+</div>
+{% else %}
+<div class="card muted">Nessun articolo ancora. Avvia la prima raccolta qui sotto.</div>
+{% endfor %}
+
+<form method="post" action="/run" style="margin-top: 1.5rem;">
+  <button type="submit" {{ 'disabled' if running }}>
+    {{ 'Raccolta in corso…' if running else 'Avvia raccolta ora' }}
+  </button>
+</form>
+{% endblock %}

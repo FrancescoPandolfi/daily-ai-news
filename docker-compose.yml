@@ -1,0 +1,18 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    # uid/gid dell'utente della VPS (ubuntu / ec2-user = 1000): così può scrivere in ./data
+    user: "1000:1000"
+    # visibile solo da nginx sulla stessa macchina, mai direttamente da internet
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./data:/data
+    mem_limit: 600m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block title %}Daily AI News{% endblock %}</title>
+  <style>
+    :root {
+      --bg: #fafaf9; --fg: #1c1917; --muted: #78716c; --card: #fff;
+      --border: #e7e5e4; --accent: #2563eb; --accent-fg: #fff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0c0a09; --fg: #f5f5f4; --muted: #a8a29e; --card: #1c1917;
+        --border: #292524; --accent: #3b82f6;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--fg);
+      font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    header {
+      display: flex; justify-content: space-between; align-items: center;
+      max-width: 820px; margin: 0 auto; padding: 1rem 1.25rem;
+    }
+    header a { color: var(--fg); text-decoration: none; font-weight: 700; }
+    main { max-width: 820px; margin: 0 auto; padding: 0 1.25rem 3rem; }
+    h2 { font-size: 1.1rem; margin: 2rem 0 .75rem; }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1rem 1.1rem; margin-bottom: .75rem;
+    }
+    .row { display: flex; gap: .5rem; flex-wrap: wrap; }
+    input[type=text], input[type=password], select {
+      font: inherit; padding: .55rem .7rem; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--card); color: var(--fg);
+    }
+    input[type=text] { flex: 1 1 100%; }
+    button {
+      font: inherit; padding: .55rem 1rem; border-radius: 8px; cursor: pointer;
+      border: 1px solid var(--border); background: var(--card); color: var(--fg);
+    }
+    button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+    button:disabled { opacity: .6; cursor: wait; }
+    .muted { color: var(--muted); font-size: .875rem; }
+    .answer { white-space: pre-wrap; }
+    .flash { border-left: 4px solid var(--accent); }
+    .error { border-left: 4px solid #dc2626; }
+    a { color: var(--accent); }
+    ol.sources { padding-left: 1.2rem; margin: .5rem 0 0; }
+    .chips a {
+      display: inline-block; padding: .2rem .65rem; margin: 0 .35rem .35rem 0;
+      border: 1px solid var(--border); border-radius: 999px;
+      text-decoration: none; font-size: .875rem; color: var(--fg);
+    }
+    .chips a.active { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+  </style>
+</head>
+<body>
+  {% if show_nav %}
+  <header>
+    <a href="/">Daily AI News</a>
+    <form method="post" action="/logout"><button type="submit">Esci</button></form>
+  </header>
+  {% endif %}
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="it">
+<body style="margin:0;padding:0;background:#fafaf9;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#1c1917;">
+  <div style="max-width:600px;margin:0 auto;padding:24px 20px;">
+    <h1 style="font-size:20px;margin:0 0 4px;">AI News del {{ today }}</h1>
+    <p style="margin:0 0 24px;color:#78716c;font-size:14px;">{{ total }} articoli nuovi</p>
+
+    {% for topic, items in by_topic.items() %}
+    <h2 style="font-size:16px;margin:28px 0 8px;border-bottom:1px solid #e7e5e4;padding-bottom:6px;">{{ topic }}</h2>
+    {% for a in items %}
+    <div style="margin-bottom:18px;">
+      <a href="{{ a.url }}" style="color:#2563eb;font-weight:600;text-decoration:none;">{{ a.title }}</a>
+      <p style="margin:4px 0 0;font-size:15px;line-height:1.5;">{{ a.summary }}</p>
+    </div>
+    {% endfor %}
+    {% endfor %}
+
+    <p style="margin-top:32px;font-size:14px;">
+      <a href="{{ base_url }}" style="color:#2563eb;">Apri l'archivio e fai domande</a>
+    </p>
+  </div>
+</body>
+</html>
