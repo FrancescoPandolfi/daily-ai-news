@@ -1,14 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Accesso · Daily AI News{% endblock %}
 {% block content %}
-<div style="max-width: 340px; margin: 18vh auto 0;">
-  <h1 style="font-size: 1.4rem;">Daily AI News</h1>
-  {% if error %}<div class="card error">{{ error }}</div>{% endif %}
-  <form method="post" action="/login" class="card">
-    <div class="row">
-      <input type="password" name="password" placeholder="Password" autofocus required style="flex: 1 1 100%;">
-      <button class="primary" type="submit" style="flex: 1 1 100%;">Entra</button>
-    </div>
+<div class="login">
+  <svg class="mark" width="42" height="42" viewBox="0 0 24 24" aria-hidden="true">{% include "_mark.svg" %}</svg>
+  <h1 class="greeting" style="margin-top: .8rem;">Daily AI News</h1>
+
+  <form class="ask" method="post" action="/login">
+    <input type="password" name="password" placeholder="Password" autocomplete="current-password" autofocus required>
+    <button class="send" type="submit" aria-label="Entra">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+    </button>
   </form>
+
+  {% if error %}<div class="notice error">{{ error }}</div>{% endif %}
 </div>
 {% endblock %}

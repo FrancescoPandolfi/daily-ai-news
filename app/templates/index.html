@@ -1,64 +1,290 @@
 {% extends "base.html" %}
+
+{% block header_actions %}
+<button class="btn" type="button" id="open-recipients">
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1.8" y="3.2" width="12.4" height="9.6" rx="2"/><path d="M2.4 4.6L8 8.8l5.6-4.2"/></svg>
+  Destinatari
+  <span class="count">{{ recipients | length }}</span>
+</button>
+{% endblock %}
+
 {% block content %}
 
-{% if flash %}<div class="card flash">{{ flash }}</div>{% endif %}
+<dialog id="recipients" class="modal" {{ 'data-open' if flash_in_dialog }} aria-labelledby="recipients-title">
+  <div class="modal-head">
+    <h2 class="section" id="recipients-title">Destinatari del digest</h2>
+    <button class="icon-btn" type="button" data-close aria-label="Chiudi">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
+    </button>
+  </div>
+  <p class="lead">Ogni mattina il digest arriva a questi indirizzi, con una email separata per ciascuno.</p>
 
-<h2>Chiedi all'archivio</h2>
-<form method="post" action="/ask" class="card" onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Cerco…';">
-  <div class="row">
-    <input type="text" name="question" value="{{ question }}" maxlength="500"
-           placeholder="Es. Cosa è successo di recente sull'AI Act?" required>
-    <select name="topic">
-      <option value="">Tutti gli argomenti</option>
-      {% for t in topics %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
-    </select>
-    <select name="days">
-      <option value="0" {{ 'selected' if days == 0 }}>Tutto il periodo</option>
-      <option value="7" {{ 'selected' if days == 7 }}>Ultimi 7 giorni</option>
-      <option value="30" {{ 'selected' if days == 30 }}>Ultimi 30 giorni</option>
-      <option value="90" {{ 'selected' if days == 90 }}>Ultimi 90 giorni</option>
-    </select>
-    <button class="primary" type="submit">Chiedi</button>
+  {% if flash and flash_in_dialog %}<div class="notice">{{ flash }}</div>{% endif %}
+
+  <ul class="recipients">
+    {% for r in recipients %}
+    <li>
+      <span class="addr" title="{{ r.email }}">{{ r.email }}</span>
+      <form method="post" action="/recipients/remove">
+        <input type="hidden" name="recipient_id" value="{{ r.id }}">
+        <button class="icon-btn remove" type="submit" aria-label="Rimuovi {{ r.email }}">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
+        </button>
+      </form>
+    </li>
+    {% else %}
+    <li class="none">Nessun destinatario: il digest non verrà inviato.</li>
+    {% endfor %}
+  </ul>
+
+  <form class="add-recipient" method="post" action="/recipients/add">
+    <input type="email" name="email" placeholder="nome@esempio.it" maxlength="254" required autocomplete="off">
+    <button class="btn primary" type="submit" {{ 'disabled' if recipients | length >= max_recipients }}>Aggiungi</button>
+  </form>
+  <p class="fine">Fino a {{ max_recipients }} indirizzi. Con il mittente di prova di Resend le email arrivano solo al tuo account: per gli altri serve un dominio verificato.</p>
+</dialog>
+
+<section class="hero">
+  <svg class="mark" width="34" height="34" viewBox="0 0 24 24" aria-hidden="true">{% include "_mark.svg" %}</svg>
+  <h1 class="greeting" id="greeting">{{ 'Cosa vuoi sapere oggi?' if not result else 'Altre domande?' }}</h1>
+</section>
+
+<form id="ask" class="ask" method="post" action="/ask">
+  <textarea name="question" rows="2" maxlength="500" required autofocus
+            placeholder="Chiedi qualcosa sulle notizie archiviate…">{{ '' if result else question }}</textarea>
+  <div class="ask-bar">
+    <div class="pills">
+      <select class="pill" name="topic" aria-label="Argomento">
+        <option value="">Tutti gli argomenti</option>
+        {% for t in topics %}<option value="{{ t }}" {{ 'selected' if t == ask_topic }}>{{ t }}</option>{% endfor %}
+      </select>
+      <select class="pill" name="days" aria-label="Periodo">
+        <option value="0" {{ 'selected' if days == 0 }}>Tutto il periodo</option>
+        <option value="7" {{ 'selected' if days == 7 }}>Ultimi 7 giorni</option>
+        <option value="30" {{ 'selected' if days == 30 }}>Ultimi 30 giorni</option>
+        <option value="90" {{ 'selected' if days == 90 }}>Ultimi 90 giorni</option>
+      </select>
+    </div>
+    <button class="send" type="submit" aria-label="Invia">
+      <svg class="arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/></svg>
+      <svg class="spin" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2a6 6 0 1 0 6 6" opacity=".9"/></svg>
+    </button>
   </div>
 </form>
+<p class="hint">Invio per cercare · Maiusc+Invio per andare a capo</p>
 
-{% if error %}<div class="card error">{{ error }}</div>{% endif %}
+{% if flash and not flash_in_dialog %}<div class="notice">{{ flash }}</div>{% endif %}
+<div class="notice error" id="ask-error" role="alert" {{ 'hidden' if not error }}>{{ error }}</div>
 
-{% if result %}
-<div class="card">
-  <div class="answer">{{ result.answer }}</div>
-  {% if result.sources %}
-  <ol class="sources muted" style="list-style: none; padding-left: 0;">
-    {% for s in result.sources %}
-    <li>[{{ s.n }}] <a href="{{ s.url }}" target="_blank" rel="noopener noreferrer">{{ s.title }}</a>
-      · {{ s.date }} · {{ s.topic }}</li>
-    {% endfor %}
-  </ol>
-  {% endif %}
+{# Sempre presente: lo script la riempie mentre la risposta arriva in streaming #}
+<section class="answer-wrap" id="answer-wrap" {{ 'hidden' if not result }}>
+  <div class="question-bubble" id="answer-question">{{ question if result }}</div>
+  <div class="answer" id="answer-text" aria-live="polite">{% if result %}{{ result.answer | answer }}{% endif %}</div>
+  <div id="answer-sources">{% include "_sources.html" %}</div>
+</section>
+
+<div class="archive-head" id="archivio">
+  <h2 class="section">Archivio</h2>
+  <form method="post" action="/run">
+    <button class="btn" type="submit" {{ 'disabled' if running }}>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"/></svg>
+      {{ 'Raccolta in corso…' if running else 'Avvia raccolta' }}
+    </button>
+  </form>
+</div>
+
+{% if topics %}
+<div class="chips">
+  <a href="/#archivio" class="chip {{ 'active' if not selected_topic }}">Tutti</a>
+  {% for t in topics %}
+  <a href="/?topic={{ t | urlencode }}#archivio" class="chip {{ 'active' if t == selected_topic }}">{{ t }}</a>
+  {% endfor %}
 </div>
 {% endif %}
 
-<h2>Archivio</h2>
-<div class="chips">
-  <a href="/" class="{{ 'active' if not selected_topic }}">Tutti</a>
-  {% for t in topics %}
-  <a href="/?topic={{ t | urlencode }}" class="{{ 'active' if t == selected_topic }}">{{ t }}</a>
-  {% endfor %}
-</div>
-
 {% for a in articles %}
-<div class="card">
-  <a href="{{ a.url }}" target="_blank" rel="noopener noreferrer"><strong>{{ a.title }}</strong></a>
-  <div class="muted">{{ (a.published_at or a.created_at)[:10] }} · {{ a.topic }}</div>
-  <p style="margin: .5rem 0 0;">{{ a.summary }}</p>
-</div>
+<a class="item {{ 'has-thumb' if a.image_url }}" href="{{ a.url }}" target="_blank" rel="noopener noreferrer">
+  <div class="item-text">
+    <div class="title">{{ a.title }}</div>
+    <div class="meta">{{ (a.published_at or a.created_at)[:10] }} · {{ a.topic }} · {{ a.url.split('/')[2] | replace('www.', '') }}</div>
+    <p>{{ a.summary }}</p>
+  </div>
+  {% if a.image_url %}<img class="thumb" src="{{ a.image_url }}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">{% endif %}
+</a>
 {% else %}
-<div class="card muted">Nessun articolo ancora. Avvia la prima raccolta qui sotto.</div>
+<div class="empty">Nessun articolo ancora. Avvia la prima raccolta con il pulsante in alto a destra.</div>
 {% endfor %}
 
-<form method="post" action="/run" style="margin-top: 1.5rem;">
-  <button type="submit" {{ 'disabled' if running }}>
-    {{ 'Raccolta in corso…' if running else 'Avvia raccolta ora' }}
-  </button>
-</form>
+{% if total_pages > 1 %}
+{% set topic_q = ('topic=' ~ selected_topic|urlencode ~ '&') if selected_topic else '' %}
+<nav class="pager" aria-label="Paginazione archivio">
+  {% if has_prev %}
+  <a class="btn" href="/?{{ topic_q }}page={{ page - 1 }}#archivio" rel="prev">Precedente</a>
+  {% else %}
+  <span class="btn" aria-disabled="true">Precedente</span>
+  {% endif %}
+  <span class="pager-status">Pagina {{ page }} di {{ total_pages }}</span>
+  {% if has_next %}
+  <a class="btn" href="/?{{ topic_q }}page={{ page + 1 }}#archivio" rel="next">Successiva</a>
+  {% else %}
+  <span class="btn" aria-disabled="true">Successiva</span>
+  {% endif %}
+</nav>
+{% endif %}
+
+<script>
+  (function () {
+    var form = document.getElementById('ask');
+    var box = form.querySelector('textarea');
+    var sendButton = form.querySelector('.send');
+    var wrap = document.getElementById('answer-wrap');
+    var questionEl = document.getElementById('answer-question');
+    var answerEl = document.getElementById('answer-text');
+    var sourcesEl = document.getElementById('answer-sources');
+    var errorEl = document.getElementById('ask-error');
+    var greetingEl = document.getElementById('greeting');
+    var ERROR_TEXT = 'Qualcosa è andato storto durante la ricerca. Riprova.';
+    var canStream = !!(window.fetch && window.ReadableStream && window.TextDecoder);
+    var busy = false;
+
+    function setBusy(value) {
+      busy = value;
+      form.classList.toggle('loading', value);
+      sendButton.disabled = value;
+      answerEl.setAttribute('aria-busy', value ? 'true' : 'false');
+    }
+
+    function escapeHtml(text) {
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                 .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // Anteprima mentre il testo arriva: stesso aspetto di quella finale (grassetto), ma le citazioni
+    // restano numeri semplici. Alla fine il server manda la versione definitiva e la sostituisce.
+    function liveHtml(text) {
+      return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    }
+
+    function showError(restoreQuestion, keepAnswer) {
+      answerEl.classList.remove('streaming', 'waiting');
+      if (!keepAnswer) wrap.hidden = true;
+      errorEl.textContent = ERROR_TEXT;
+      errorEl.hidden = false;
+      if (restoreQuestion && !box.value) box.value = restoreQuestion;
+    }
+
+    async function askStreaming() {
+      var question = box.value.trim();
+      if (!question || busy) return;
+      var body = new URLSearchParams(new FormData(form));
+      var received = '';
+      var finished = false;
+      var frame = 0;
+
+      setBusy(true);
+      errorEl.hidden = true;
+      greetingEl.textContent = 'Altre domande?';
+      questionEl.textContent = question;
+      answerEl.textContent = '';
+      sourcesEl.innerHTML = '';
+      answerEl.classList.add('streaming', 'waiting');
+      wrap.hidden = false;
+      box.value = '';
+      wrap.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+
+      function handle(line) {
+        if (!line) return;
+        var event = JSON.parse(line);
+        if (event.type === 'delta') {
+          received += event.text;
+          answerEl.classList.remove('waiting');
+          if (!frame) {
+            frame = requestAnimationFrame(function () {
+              frame = 0;
+              answerEl.innerHTML = liveHtml(received);
+            });
+          }
+        } else if (event.type === 'final') {
+          cancelAnimationFrame(frame);
+          frame = 0;
+          answerEl.innerHTML = event.answer_html;
+          sourcesEl.innerHTML = event.sources_html;
+          answerEl.classList.remove('streaming', 'waiting');
+          finished = true;
+        } else if (event.type === 'error') {
+          throw new Error(event.message);
+        }
+      }
+
+      try {
+        var response = await fetch('/ask/stream', {
+          method: 'POST',
+          body: body,
+          headers: { 'Accept': 'application/x-ndjson' },
+          credentials: 'same-origin'
+        });
+        if (response.status === 401 || response.redirected) {
+          window.location.href = '/login';
+          return;
+        }
+        if (!response.ok || !response.body) throw new Error('HTTP ' + response.status);
+
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+        while (true) {
+          var chunk = await reader.read();
+          if (chunk.done) break;
+          buffer += decoder.decode(chunk.value, { stream: true });
+          var lines = buffer.split('\n');
+          buffer = lines.pop();
+          lines.forEach(handle);
+        }
+        handle(buffer.trim());
+        if (!finished) throw new Error('Risposta interrotta');
+      } catch (err) {
+        cancelAnimationFrame(frame);
+        if (received) answerEl.innerHTML = liveHtml(received);
+        showError(question, !!received);
+      } finally {
+        setBusy(false);
+        box.focus();
+      }
+    }
+
+    form.addEventListener('submit', function (e) {
+      if (!canStream) {  // senza streaming il form funziona come prima: pagina ricaricata
+        form.classList.add('loading');
+        sendButton.disabled = true;
+        return;
+      }
+      e.preventDefault();
+      askStreaming();
+    });
+    box.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        if (box.value.trim()) form.requestSubmit();
+      }
+    });
+    if (window.location.hash) {
+      var target = document.querySelector(window.location.hash);
+      if (target) target.scrollIntoView({ block: 'center' });
+    }
+
+    var dialog = document.getElementById('recipients');
+    document.getElementById('open-recipients').addEventListener('click', function () {
+      dialog.showModal();
+    });
+    dialog.querySelector('[data-close]').addEventListener('click', function () {
+      dialog.close();
+    });
+    // clic sullo sfondo scuro = chiudi
+    dialog.addEventListener('click', function (e) {
+      if (e.target === dialog) dialog.close();
+    });
+    // dopo aggiungi/rimuovi la pagina si ricarica: la finestra deve restare aperta
+    if (dialog.hasAttribute('data-open')) dialog.showModal();
+  })();
+</script>
 {% endblock %}

@@ -1,0 +1,18 @@
+{% if result and result.sources %}
+<div class="sources">
+  <div class="label">{{ 'Fonti' if result.sources_cited else 'Articoli consultati' }}</div>
+  {% if not result.sources_cited %}
+  <p class="sources-note">La risposta non cita direttamente nessuno di questi articoli.</p>
+  {% endif %}
+  {% for s in result.sources %}
+  <a id="src-{{ s.n }}" class="source" href="{{ s.url }}" target="_blank" rel="noopener noreferrer">
+    <span class="num">{{ s.n }}</span>
+    <span class="body">
+      <span class="title">{{ s.title }}</span>
+      <span class="meta">{{ s.url.split('/')[2] | replace('www.', '') }} · {{ s.date }} · {{ s.topic }}</span>
+    </span>
+    {% if s.image %}<img class="thumb" src="{{ s.image }}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">{% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% endif %}

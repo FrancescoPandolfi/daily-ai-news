@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any
 
+from . import metrics
 from .config import get_settings
 from .llm import get_client
 from .tools import WebTools
@@ -72,13 +74,31 @@ def run_topic_agent(topic: str, tools: WebTools, known_urls: list[str]) -> list[
 
     for step in range(MAX_STEPS):
         is_last_step = step == MAX_STEPS - 1
-        response = client.chat.completions.create(
+        started = time.perf_counter()
+        try:
+            response = client.chat.completions.create(
+                model=settings.llm_model,
+                messages=messages,
+                tools=TOOLS,
+                # all'ultimo giro si impedisce di chiamare altri tool, per forzare la risposta finale
+                tool_choice="none" if is_last_step else "auto",
+                response_format={"type": "json_object"},
+            )
+        except Exception:
+            metrics.record_usage(
+                "agent_step",
+                model=settings.llm_model,
+                duration_ms=metrics.elapsed_ms(started),
+                ok=False,
+            )
+            raise
+        usage = response.usage
+        metrics.record_usage(
+            "agent_step",
             model=settings.llm_model,
-            messages=messages,
-            tools=TOOLS,
-            # all'ultimo giro si impedisce di chiamare altri tool, per forzare la risposta finale
-            tool_choice="none" if is_last_step else "auto",
-            response_format={"type": "json_object"},
+            tokens_in=usage.prompt_tokens if usage else 0,
+            tokens_out=usage.completion_tokens if usage else 0,
+            duration_ms=metrics.elapsed_ms(started),
         )
         message = response.choices[0].message
         messages.append(message.model_dump(exclude_none=True))

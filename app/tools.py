@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
 
+from . import metrics
 from .config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -41,21 +43,34 @@ class WebTools:
             headers={"Authorization": f"Bearer {settings.tavily_api_key}"},
         )
         self._pages: dict[str, str] = {}
+        self._images: dict[str, list[str]] = {}
 
     def close(self) -> None:
         self._client.close()
 
+    def images_for(self, url: str) -> list[str]:
+        """Immagini trovate nella pagina quando è stata letta (vuoto se non letta o senza immagini)."""
+        return self._images.get(normalize_url(url), [])
+
     def search_web(self, query: str) -> list[dict[str, Any]]:
-        response = self._client.post(
-            "/search",
-            json={
-                "query": query,
-                "topic": "news",
-                "time_range": self._time_range,
-                "max_results": 6,
-            },
-        )
-        response.raise_for_status()
+        started = time.perf_counter()
+        ok = False
+        try:
+            response = self._client.post(
+                "/search",
+                json={
+                    "query": query,
+                    "topic": "news",
+                    "time_range": self._time_range,
+                    "max_results": 6,
+                },
+            )
+            response.raise_for_status()
+            ok = True
+        finally:
+            metrics.record_usage(
+                "search", units=1, duration_ms=metrics.elapsed_ms(started), ok=ok
+            )
         return [
             {
                 "title": item.get("title", ""),
@@ -72,14 +87,25 @@ class WebTools:
         if key in self._pages:
             return self._pages[key]
         text = ""
+        started = time.perf_counter()
+        ok = False
         try:
-            response = self._client.post("/extract", json={"urls": [url]})
+            # include_images non costa crediti in più: serve per scegliere la copertina
+            response = self._client.post("/extract", json={"urls": [url], "include_images": True})
             response.raise_for_status()
+            ok = True
             results = response.json().get("results", [])
             if results:
                 text = (results[0].get("raw_content") or "")[:MAX_CONTENT_CHARS]
+                self._images[key] = [
+                    image for image in results[0].get("images") or [] if isinstance(image, str)
+                ]
         except httpx.HTTPError as exc:
             logger.warning("Lettura fallita per %s: %s", url, exc)
+        finally:
+            metrics.record_usage(
+                "extract", units=1, duration_ms=metrics.elapsed_ms(started), ok=ok
+            )
         self._pages[key] = text
         return text
 

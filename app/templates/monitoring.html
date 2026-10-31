@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Monitoraggio · Daily AI News{% endblock %}
+{% block head_extra %}{% if report.status.level == 'running' %}<meta http-equiv="refresh" content="15">{% endif %}{% endblock %}
+
+{% set status_labels = {'ok': ['ok', 'Completata'], 'partial': ['warn', 'Con errori'], 'failed': ['bad', 'Fallita'], 'running': ['running', 'In corso']} %}
+{% set trigger_labels = {'scheduler': 'automatica', 'manual': 'manuale', 'cli': 'da terminale'} %}
+{% set reason_labels = {'duplicate': 'già in archivio', 'embedding_failed': 'indicizzazione fallita'} %}
+
+{% block content %}
+{% set s = report.status %}
+{% set c = report.costs %}
+{% set r = report.rag %}
+{% set sys = report.system %}
+
+<div class="page-head">
+  <h1>Monitoraggio</h1>
+  <p>Cosa ha fatto l'app, quanto è costato e se risponde bene.</p>
+</div>
+
+<!-- STATO -->
+<section class="panel status-card level-{{ s.level }}">
+  <div class="status-head">
+    <span class="dot"></span>
+    <div>
+      <div class="status-title">{{ s.headline }}</div>
+      <div class="status-detail">{{ s.detail }}</div>
+    </div>
+  </div>
+  <dl class="facts">
+    <div>
+      <dt>Ultima raccolta</dt>
+      <dd>
+        {% if s.last_run %}{{ s.last_run.started_at | localdt }}<small>{{ s.last_run.started_at | ago }} · {{ trigger_labels[s.last_run.trigger_kind] }}</small>
+        {% else %}—{% endif %}
+      </dd>
+    </div>
+    <div>
+      <dt>Prossima raccolta</dt>
+      <dd>{% if s.next_run %}{{ s.next_run | localdt }}<small>{{ s.next_run | ago }}</small>{% else %}—<small>scheduler non attivo</small>{% endif %}</dd>
+    </div>
+    <div>
+      <dt>Ultimo digest</dt>
+      <dd>
+        {% if s.last_run and (s.last_run.emails_sent or s.last_run.emails_failed) %}
+          {{ s.last_run.emails_sent }} inviate{% if s.last_run.emails_failed %}, <span class="fail">{{ s.last_run.emails_failed }} fallite</span>{% endif %}
+        {% else %}—<small>nessun invio</small>{% endif %}
+      </dd>
+    </div>
+    <div>
+      <dt>Ultimo backup</dt>
+      <dd>{% if s.last_backup %}{{ s.last_backup | localdt }}<small>{{ s.last_backup | ago }}</small>{% else %}—<small>nessuno ancora</small>{% endif %}</dd>
+    </div>
+  </dl>
+</section>
+
+<!-- COSTI -->
+<div class="section-title"><h2 class="section">Costi</h2><span class="muted">stime in dollari · mese {{ c.month_label }}</span></div>
+<div class="tiles">
+  <div class="tile"><div class="k">Questo mese</div><div class="v">{{ c.month | usd }}</div></div>
+  <div class="tile"><div class="k">Oggi</div><div class="v">{{ c.today | usd }}</div></div>
+  <div class="tile"><div class="k">Per raccolta</div><div class="v">{{ c.avg_per_run | usd }}</div><div class="s">media ultimi 30 giorni</div></div>
+  <div class="tile"><div class="k">Per articolo</div><div class="v">{{ c.per_article | usd }}</div><div class="s">questo mese</div></div>
+</div>
+
+<div class="panel" style="margin-top: .6rem;">
+  <div class="label">Dove vanno i soldi</div>
+  <div class="breakdown">
+    {% for g in c.groups %}
+    <div class="brow">
+      <span class="name">{{ g.label }}</span>
+      <span class="cost">{{ g.cost | usd }}</span>
+      <span class="meter"><span style="width: {{ g.share | round(1) }}%"></span></span>
+      <span class="detail">{{ g.calls }} chiamate{% if g.tokens %} · {{ '{:,}'.format(g.tokens).replace(',', '.') }} token{% endif %}</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="label" style="margin-top: 1.2rem;">Tavily · crediti del mese</div>
+  <div class="brow" style="margin-top: .4rem;">
+    <span class="name">{{ c.tavily_credits }} su {{ c.tavily_free }} gratuiti</span>
+    <span class="cost">{{ c.tavily_pct | round | int }}%</span>
+    <span class="meter"><span style="width: {{ c.tavily_pct | round(1) }}%; {% if c.tavily_pct >= 90 %}background: var(--bad);{% endif %}"></span></span>
+  </div>
+
+  <div class="label" style="margin-top: 1.2rem;">Ultimi 30 giorni</div>
+  <div class="bars" role="img" aria-label="Costo giornaliero degli ultimi 30 giorni">
+    {% for d in c.series %}
+    <div class="bar {{ 'zero' if d.empty }} {{ 'today' if d.today }}" style="height: {{ d.height | round(1) }}%" title="{{ d.label }}: {{ d.cost | usd }}"></div>
+    {% endfor %}
+  </div>
+  <div class="bars-axis"><span>{{ c.series[0].label }}</span><span>oggi</span></div>
+
+  <p class="note">
+    Sono <strong>stime</strong> calcolate con i prezzi di listino in <code>app/pricing.py</code>, da confrontare con le fatture.
+    Tavily conta un credito per ricerca o lettura di pagina e i primi {{ c.tavily_free }} al mese sono gratuiti:
+    il suo costo resta a zero finché non li superi.
+  </p>
+  {% if c.unknown_models %}
+  <p class="note warn">Prezzo non configurato per: {{ c.unknown_models | join(', ') }}. Questi costi risultano a zero: aggiungili in <code>app/pricing.py</code>.</p>
+  {% endif %}
+</div>
+
+<!-- RACCOLTE -->
+<div class="section-title"><h2 class="section">Raccolte</h2><span class="muted">ultime {{ report.runs | length }}</span></div>
+{% for run in report.runs %}
+{% set st = status_labels[run.status] %}
+<details class="run">
+  <summary>
+    <span class="badge {{ st[0] }}">{{ st[1] }}</span>
+    <span class="run-when">{{ run.started_at | localdt }}<small>{{ trigger_labels[run.trigger_kind] }} · {{ run.duration_s | duration }}</small></span>
+    <span class="run-cost">{{ run.cost | usd }}</span>
+    <span class="run-sum">
+      {{ run.found }} proposti · <strong>{{ run.new_count }} nuovi</strong> · {{ run.discarded }} scartati
+      {%- if run.errors %} · <span class="fail">{{ run.errors | length }} {{ 'errore' if run.errors | length == 1 else 'errori' }}</span>{% endif %}
+    </span>
+  </summary>
+  <div class="run-body">
+    {% if run.topics %}
+    <div>
+      <h4>Per argomento</h4>
+      <table class="mini">
+        <tr><th>Argomento</th><th class="num">Proposti</th><th class="num">Nuovi</th></tr>
+        {% for t in run.topics %}
+        <tr>
+          <td>{{ t.topic }}{% if t.error %}<div class="err">{{ t.error }}</div>{% endif %}</td>
+          <td class="num">{{ t.found }}</td><td class="num">{{ t.new_count }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+
+    {% if run.skipped %}
+    <div>
+      <h4>Scartati ({{ run.skipped | length }})</h4>
+      <ul class="plain">
+        {% for item in run.skipped %}
+        <li><a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
+          <div class="why">{{ reason_labels[item.reason] }} · {{ item.topic }}</div></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if run.unreadable %}
+    <p class="note" style="margin: 0;">
+      {{ run.unreadable }} {{ 'articolo salvato' if run.unreadable == 1 else 'articoli salvati' }} solo con il riassunto, perché la pagina non era leggibile.
+    </p>
+    {% endif %}
+
+    {% if run.errors %}
+    <div>
+      <h4>Errori</h4>
+      <ul class="plain">{% for e in run.errors %}<li class="errtext">{{ e }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    <div class="why muted" style="font-size: .8rem;">
+      Email: {{ run.emails_sent }} inviate{% if run.emails_failed %}, {{ run.emails_failed }} fallite{% endif %}
+    </div>
+  </div>
+</details>
+{% else %}
+<div class="empty">Nessuna raccolta registrata. Avviane una dalla home.</div>
+{% endfor %}
+
+<!-- RISPOSTE -->
+<div class="section-title"><h2 class="section">Risposte alle domande</h2><span class="muted">ultimi 30 giorni</span></div>
+<div class="tiles">
+  <div class="tile"><div class="k">Domande</div><div class="v">{{ r.count }}</div></div>
+  <div class="tile"><div class="k">Tempo mediano</div><div class="v">{{ r.median_ms | ms }}</div></div>
+  <div class="tile"><div class="k">Caso peggiore (95%)</div><div class="v">{{ r.p95_ms | ms }}</div><div class="s">19 su 20 più veloci di così</div></div>
+  <div class="tile {{ 'bad' if r.errors }}"><div class="k">Errori</div><div class="v">{{ r.errors }}</div><div class="s">{{ r.error_pct | dec(0) }}% delle domande</div></div>
+  <div class="tile"><div class="k">Costo medio</div><div class="v">{{ r.avg_cost | usd }}</div><div class="s">per domanda</div></div>
+</div>
+
+{% if r.recent %}
+<div class="panel" style="margin-top: .6rem;">
+  <table class="mini">
+    <tr><th>Domanda</th><th class="num">Fonti</th><th class="num">Tempo</th><th class="num">Costo</th><th class="num">Quando</th></tr>
+    {% for q in r.recent %}
+    <tr class="qrow">
+      <td class="q" title="{{ q.question }}">{{ q.question }}{% if not q.ok %}<div class="err" style="white-space: normal;">{{ q.error }}</div>{% endif %}</td>
+      <td class="num">{{ q.sources }}</td>
+      <td class="num {{ 'fail' if not q.ok else 'slow' if q.latency_ms >= r.slow_ms }}">{{ q.latency_ms | ms }}</td>
+      <td class="num">{{ q.cost_usd | usd }}</td>
+      <td class="num">{{ q.ts | localdt }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="note">I tempi sopra {{ (r.slow_ms / 1000) | int }} secondi sono in evidenziato. Il testo delle domande è salvato per poterle rivedere.</p>
+</div>
+{% else %}
+<div class="empty" style="margin-top: .6rem;">Nessuna domanda ancora.</div>
+{% endif %}
+
+<!-- SISTEMA -->
+<div class="section-title"><h2 class="section">Sistema</h2></div>
+<div class="tiles">
+  <div class="tile"><div class="k">Database</div><div class="v">{{ sys.db_mb | dec }} MB</div><div class="s">{{ sys.articles }} articoli · {{ sys.chunks }} blocchi</div></div>
+  <div class="tile"><div class="k">Disco</div><div class="v">{{ sys.disk_used_pct | dec(0) }}%</div><div class="s">{{ sys.disk_free_gb | dec }} GB liberi</div></div>
+  <div class="tile"><div class="k">Memoria app</div><div class="v">{{ sys.rss_mb | dec(0) }} MB</div></div>
+  <div class="tile"><div class="k">Attiva da</div><div class="v">{{ sys.uptime_s | duration }}</div><div class="s">dall'ultimo avvio</div></div>
+  <div class="tile {{ 'bad' if sys.cert_days is not none and sys.cert_days < 14 }}">
+    <div class="k">Certificato HTTPS</div>
+    <div class="v">{% if sys.cert_days is none %}n/d{% else %}{{ sys.cert_days }} g{% endif %}</div>
+    <div class="s">{% if sys.cert_days is none %}non verificabile da qui{% else %}alla scadenza{% endif %}</div>
+  </div>
+  <div class="tile"><div class="k">Destinatari</div><div class="v">{{ sys.recipients }}</div></div>
+</div>
+
+<p class="note" style="margin-top: 2rem;">
+  Se l'app si ferma non può avvisarti da sola: per saperlo serve un controllo esterno sull'indirizzo <code>/health</code>.
+</p>
+{% endblock %}

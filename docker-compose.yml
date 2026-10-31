@@ -3,6 +3,9 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
+    environment:
+      # ha la precedenza su env_file: il database deve stare nel volume montato su /data
+      DB_PATH: /data/news.db
     # uid/gid dell'utente della VPS (ubuntu / ec2-user = 1000): così può scrivere in ./data
     user: "1000:1000"
     # visibile solo da nginx sulla stessa macchina, mai direttamente da internet
