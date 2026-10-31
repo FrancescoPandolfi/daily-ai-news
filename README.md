@@ -87,7 +87,8 @@ La porta 8000 è già legata a `127.0.0.1`.
 ## Destinatari del digest
 
 La gestione dei destinatari dall'app è **nascosta** finché non imposti `RECIPIENTS_UI=true` nel `.env`
-(con il mittente di prova di Resend il digest arriva comunque solo a te, quindi non serve).
+(serve solo se hai verificato un dominio su Resend: con il mittente di prova il digest arriva
+comunque solo a te). Nella finestra compare un avviso finché `EMAIL_FROM` è ancora `@resend.dev`.
 Quando è attiva, dal pulsante **Destinatari** in alto a destra aggiungi o rimuovi gli indirizzi
 (massimo 20). Ognuno riceve una email separata, quindi nessuno vede gli altri.
 

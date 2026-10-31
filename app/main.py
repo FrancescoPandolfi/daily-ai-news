@@ -115,6 +115,7 @@ def _page_context(
         "ask_topic": "",
         "running": pipeline.is_running(),
         "recipients_ui": settings.recipients_ui,
+        "sandbox_sender": settings.email_from.lower().rstrip("> ").endswith("@resend.dev"),
         "recipients": storage.list_recipients(),
         "max_recipients": MAX_RECIPIENTS,
         "flash": None,

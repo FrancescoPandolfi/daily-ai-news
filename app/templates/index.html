@@ -44,7 +44,7 @@
     <input type="email" name="email" placeholder="nome@esempio.it" maxlength="254" required autocomplete="off">
     <button class="btn primary" type="submit" {{ 'disabled' if recipients | length >= max_recipients }}>Aggiungi</button>
   </form>
-  <p class="fine">Fino a {{ max_recipients }} indirizzi. Con il mittente di prova di Resend le email arrivano solo al tuo account: per gli altri serve un dominio verificato.</p>
+  <p class="fine">Fino a {{ max_recipients }} indirizzi.{% if sandbox_sender %} Con il mittente di prova di Resend le email arrivano solo al tuo account: per gli altri serve un dominio verificato.{% endif %}</p>
 </dialog>
 {% endif %}
 
