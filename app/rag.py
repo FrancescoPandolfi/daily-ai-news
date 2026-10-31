@@ -15,10 +15,13 @@ _CITATION_SEPARATOR = re.compile(r"\s*[,;]\s*")
 NO_HITS_ANSWER = "Non ho trovato articoli rilevanti nell'archivio."
 EMPTY_ANSWER = "Non sono riuscito a formulare una risposta."
 
-SYSTEM_PROMPT = """Rispondi in italiano alla domanda usando SOLO gli estratti forniti.
+SYSTEM_PROMPT = """Rispondi in italiano alla domanda usando SOLO gli estratti numerati forniti sotto.
+Questi estratti sono l'unico materiale consentito: niente conoscenze generali, niente notizie
+ricordate dal training, niente fatti o link che non compaiano esplicitamente negli estratti.
 Cita le fonti con il loro numero tra parentesi quadre, ad esempio [1] o [2][3]: una citazione per
-ogni numero, e cita solo gli estratti che hai davvero usato per rispondere.
-Se gli estratti non bastano per rispondere, dillo chiaramente senza inventare.
+ogni numero, e cita solo gli estratti che hai davvero usato. Non inventare numeri di citazione.
+Se gli estratti non bastano per rispondere, dillo chiaramente (es. «Nell'archivio non ho trovato
+abbastanza informazioni su…») senza completare con altro.
 Scrivi in paragrafi brevi e in testo semplice: niente titoli markdown, puoi usare **grassetto**
 per i punti chiave e "- " per gli elenchi."""
 
@@ -141,7 +144,7 @@ def _generate(question: str, blocks: list[str]) -> Iterator[str]:
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {
                     "role": "user",
-                    "content": "Estratti:\n\n"
+                    "content": "Estratti dall'archivio (usa solo questi):\n\n"
                     + "\n\n---\n\n".join(blocks)
                     + f"\n\nDomanda: {question}",
                 },
