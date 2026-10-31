@@ -114,6 +114,7 @@ def _page_context(
         "selected_topic": topic or "",
         "ask_topic": "",
         "running": pipeline.is_running(),
+        "recipients_ui": settings.recipients_ui,
         "recipients": storage.list_recipients(),
         "max_recipients": MAX_RECIPIENTS,
         "flash": None,
@@ -235,6 +236,8 @@ def monitoring_page(request: Request) -> Response:
 
 @app.post("/recipients/add")
 def add_recipient(request: Request, email: str = Form(...)) -> Response:
+    if not settings.recipients_ui:
+        return Response(status_code=404)
     normalized = storage.normalize_email(email)
     if normalized is None:
         message = "Indirizzo email non valido."
@@ -249,6 +252,8 @@ def add_recipient(request: Request, email: str = Form(...)) -> Response:
 
 @app.post("/recipients/remove")
 def remove_recipient(request: Request, recipient_id: int = Form(...)) -> Response:
+    if not settings.recipients_ui:
+        return Response(status_code=404)
     message = (
         "Destinatario rimosso."
         if storage.remove_recipient(recipient_id)

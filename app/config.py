@@ -20,6 +20,10 @@ def _optional(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip() or default
 
 
+def _flag(name: str) -> bool:
+    return _optional(name).lower() in {"1", "true", "yes", "si", "on"}
+
+
 @dataclass(frozen=True)
 class Settings:
     openai_api_key: str
@@ -30,6 +34,7 @@ class Settings:
     resend_api_key: str
     email_to: str
     email_from: str
+    recipients_ui: bool
 
     base_url: str
     topics: tuple[str, ...]
@@ -63,6 +68,7 @@ def get_settings() -> Settings:
         resend_api_key=_optional("RESEND_API_KEY"),
         email_to=_optional("EMAIL_TO"),
         email_from=_optional("EMAIL_FROM", "Daily AI News <onboarding@resend.dev>"),
+        recipients_ui=_flag("RECIPIENTS_UI"),
         base_url=_optional("BASE_URL", "http://localhost:8000").rstrip("/"),
         topics=topics,
         max_articles_per_topic=int(_optional("MAX_ARTICLES_PER_TOPIC", "4")),

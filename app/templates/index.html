@@ -1,15 +1,18 @@
 {% extends "base.html" %}
 
 {% block header_actions %}
+{% if recipients_ui %}
 <button class="btn" type="button" id="open-recipients">
   <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1.8" y="3.2" width="12.4" height="9.6" rx="2"/><path d="M2.4 4.6L8 8.8l5.6-4.2"/></svg>
   Destinatari
   <span class="count">{{ recipients | length }}</span>
 </button>
+{% endif %}
 {% endblock %}
 
 {% block content %}
 
+{% if recipients_ui %}
 <dialog id="recipients" class="modal" {{ 'data-open' if flash_in_dialog }} aria-labelledby="recipients-title">
   <div class="modal-head">
     <h2 class="section" id="recipients-title">Destinatari del digest</h2>
@@ -43,6 +46,7 @@
   </form>
   <p class="fine">Fino a {{ max_recipients }} indirizzi. Con il mittente di prova di Resend le email arrivano solo al tuo account: per gli altri serve un dominio verificato.</p>
 </dialog>
+{% endif %}
 
 <section class="hero">
   <svg class="mark" width="34" height="34" viewBox="0 0 24 24" aria-hidden="true">{% include "_mark.svg" %}</svg>
@@ -272,6 +276,7 @@
       if (target) target.scrollIntoView({ block: 'center' });
     }
 
+    {% if recipients_ui %}
     var dialog = document.getElementById('recipients');
     document.getElementById('open-recipients').addEventListener('click', function () {
       dialog.showModal();
@@ -285,6 +290,7 @@
     });
     // dopo aggiungi/rimuovi la pagina si ricarica: la finestra deve restare aperta
     if (dialog.hasAttribute('data-open')) dialog.showModal();
+    {% endif %}
   })();
 </script>
 {% endblock %}
