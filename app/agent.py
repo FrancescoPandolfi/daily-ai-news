@@ -41,18 +41,23 @@ TOOLS: list[dict[str, Any]] = [
     },
 ]
 
-SYSTEM_PROMPT = """Sei un redattore che prepara un briefing quotidiano di notizie.
+SYSTEM_PROMPT = """Sei un redattore che prepara un briefing quotidiano di notizie sull'intelligenza artificiale.
 Per l'argomento indicato:
-1. Cerca notizie recenti con search_web (puoi fare più ricerche con query diverse).
-2. Scegli gli articoli più rilevanti e originali: preferisci fonti primarie, evita duplicati
-   della stessa notizia e contenuti promozionali.
-3. Leggi ogni articolo scelto con read_url prima di riassumerlo.
+1. Cerca notizie recenti con search_web (puoi fare più ricerche con query diverse). Nelle query
+   includi sempre termini legati all'AI / all'argomento (es. AI, LLM, agenti, AI Act), così
+   i risultati restano in tema.
+2. Scegli SOLO articoli il cui tema centrale è l'argomento indicato. Scarta cronaca generica,
+   politica, sport, economia o società che nominano l'AI solo di passaggio (o nel footer del sito).
+   Preferisci fonti primarie; evita duplicati della stessa notizia e contenuti promozionali.
+3. Leggi ogni articolo scelto con read_url prima di riassumerlo e verifica che parli davvero
+   dell'argomento: se dopo la lettura non è pertinente, escludilo.
 4. Scrivi per ciascuno un riassunto fedele di 3-4 frasi, in italiano, senza inventare nulla.
 
 Non includere articoli il cui URL è nell'elenco "già inviati".
+Meglio zero articoli che articoli fuori tema.
 Quando hai finito, rispondi SOLO con un oggetto JSON in questo formato:
 {"articles": [{"title": "...", "url": "...", "summary": "...", "published_date": "YYYY-MM-DD o null"}]}
-Se non trovi nulla di nuovo, rispondi {"articles": []}."""
+Se non trovi nulla di nuovo o di pertinente, rispondi {"articles": []}."""
 
 
 def run_topic_agent(topic: str, tools: WebTools, known_urls: list[str]) -> list[dict[str, Any]]:
