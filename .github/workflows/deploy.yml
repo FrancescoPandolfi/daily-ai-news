@@ -3,6 +3,7 @@ name: Deploy
 on:
   push:
     branches: [main]
+    paths-ignore: ["**.md"]  # una modifica al solo README non richiede un nuovo deploy
   workflow_dispatch:
 
 concurrency:
@@ -14,14 +15,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy sulla VPS via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script_stop: true
-          script: |
-            cd ~/daily-ai-news
-            git pull --ff-only
-            docker compose up -d --build
-            docker image prune -f
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Il comando "deploy" è solo un segnaposto: sulla VPS la chiave è legata a
+          # deploy/deploy.sh (command="..." in authorized_keys) e può eseguire solo quello.
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
+              -o ServerAliveInterval=30 "$VPS_USER@$VPS_HOST" deploy

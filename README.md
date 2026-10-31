@@ -28,14 +28,27 @@ Per fare una raccolta da terminale, senza email e senza avviare l'app:
 
 ## Deploy su EC2
 
-Prerequisiti: Docker con il plugin compose, nginx con HTTPS già configurato.
+Prerequisiti: nginx con HTTPS già configurato. Docker e git si installano al passo 1
+(comandi per **Amazon Linux 2023**; su Ubuntu usa `apt` e il pacchetto `docker-compose-plugin`).
 
-1. **Swap** (la `t3.micro` ha 1 GiB: senza swap la build Docker può finire in out-of-memory):
+1. **Swap e Docker** (la `t3.micro` ha 1 GiB: senza swap la build Docker può finire in out-of-memory):
    ```bash
-   sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
-   sudo mkswap /swapfile && sudo swapon /swapfile
-   echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+   # swap da 2 GiB: su Amazon Linux (XFS) si crea con dd, fallocate può essere rifiutato da swapon
+   sudo dd if=/dev/zero of=/swapfile bs=128M count=16 status=progress
+   sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+   echo '/swapfile swap swap defaults 0 0' | sudo tee -a /etc/fstab
+
+   # Docker, git e il plugin compose (non è nei pacchetti di Amazon Linux)
+   sudo dnf install -y docker git
+   sudo systemctl enable --now docker
+   sudo usermod -aG docker ec2-user          # poi esci e rientra in SSH
+   sudo mkdir -p /usr/local/lib/docker/cli-plugins
+   sudo curl -SL https://github.com/docker/compose/releases/download/v2.39.4/docker-compose-linux-x86_64 \
+     -o /usr/local/lib/docker/cli-plugins/docker-compose
+   sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
    ```
+   La versione di compose è fissata a 2.39.4 di proposito: le successive richiedono un buildx più
+   recente di quello incluso in Amazon Linux 2023 ("compose build requires buildx 0.17 or later").
 2. **Codice e configurazione**:
    ```bash
    git clone <url-del-repo> ~/daily-ai-news && cd ~/daily-ai-news
@@ -46,13 +59,30 @@ Prerequisiti: Docker con il plugin compose, nginx con HTTPS già configurato.
    ```
 3. **nginx**: incolla `deploy/nginx-location.conf` nel blocco `server` HTTPS del dominio,
    poi `sudo nginx -t && sudo systemctl reload nginx`.
-4. **Deploy automatico da GitHub**: nel repo aggiungi i secret `VPS_HOST`, `VPS_USER`
-   e `VPS_SSH_KEY` (chiave privata dedicata, con la pubblica in `~/.ssh/authorized_keys`
-   della VPS). Ogni push su `main` esegue `git pull` e `docker compose up -d --build`.
-   Se il repo è privato, la VPS ha bisogno di una deploy key in sola lettura.
+4. **Deploy automatico da GitHub**: ogni push su `main` fa partire il workflow, che si collega
+   alla VPS via SSH ed esegue `deploy/deploy.sh` (`git pull`, `docker compose up -d --build`,
+   attesa di `/health`). Si imposta una volta sola:
+   ```bash
+   # chiave dedicata (la privata va solo nei secret di GitHub, poi si cancella dal computer)
+   ssh-keygen -t ed25519 -N "" -C github-deploy -f /tmp/deploy_key
+   gh secret set VPS_SSH_KEY < /tmp/deploy_key
+   gh secret set VPS_HOST --body sig.pandolfi.xyz
+   gh secret set VPS_USER --body ec2-user
+   cat /tmp/deploy_key.pub     # la pubblica si installa sulla VPS, vedi sotto
+   rm /tmp/deploy_key /tmp/deploy_key.pub
+   ```
+   Sulla VPS la pubblica va in `~/.ssh/authorized_keys` **legata allo script**, così la chiave di
+   GitHub non può aprire una shell ma solo lanciare il deploy:
+   ```
+   command="/home/ec2-user/daily-ai-news/deploy/deploy.sh",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAA... github-deploy
+   ```
+   Il repo è pubblico, quindi la VPS scarica il codice senza chiavi. Se lo rendi privato serve
+   una deploy key in sola lettura anche per il `git pull`.
 
-Security group: apri solo 80 e 443 al mondo; la 22 solo dal tuo IP. La porta 8000
-è già legata a `127.0.0.1`.
+Security group: apri solo 80 e 443 al mondo. La 22 deve essere raggiungibile da GitHub, i cui
+indirizzi cambiano: resta protetta dalla sola chiave (niente password) e la chiave di deploy può solo
+lanciare lo script. Per amministrare la VPS usa EC2 Instance Connect o la tua chiave personale.
+La porta 8000 è già legata a `127.0.0.1`.
 
 ## Destinatari del digest
 
