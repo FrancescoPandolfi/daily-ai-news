@@ -146,6 +146,16 @@ Se l'app si ferma non può avvisarti da sola: per questo serve un controllo este
 - Questa copia sta sullo stesso disco: per proteggerti da un guasto della VPS
   attiva anche gli snapshot EBS giornalieri (AWS Data Lifecycle Manager).
 
+## Interruttori API
+
+Nel `.env` puoi spegnere le chiamate a OpenAI/Tavily senza fermare il container:
+
+- `PIPELINE_ENABLED=false` — niente raccolta automatica né “Avvia raccolta”
+- `RAG_ENABLED=false` — niente domande sull’archivio
+
+Di default sono `true`. Dopo averli cambiati ricrea il container
+(`docker compose up -d --force-recreate`) perché legga di nuovo il `.env`.
+
 ## Limiti da conoscere
 
 - **Un solo worker**: lo scheduler è nel processo. Non aumentare i worker di uvicorn,

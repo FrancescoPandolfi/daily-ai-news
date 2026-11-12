@@ -20,8 +20,11 @@ def _optional(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip() or default
 
 
-def _flag(name: str) -> bool:
-    return _optional(name).lower() in {"1", "true", "yes", "si", "on"}
+def _flag(name: str, *, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "si", "on"}
 
 
 @dataclass(frozen=True)
@@ -35,6 +38,8 @@ class Settings:
     email_to: str
     email_from: str
     recipients_ui: bool
+    pipeline_enabled: bool
+    rag_enabled: bool
 
     base_url: str
     topics: tuple[str, ...]
@@ -69,6 +74,8 @@ def get_settings() -> Settings:
         email_to=_optional("EMAIL_TO"),
         email_from=_optional("EMAIL_FROM", "Daily AI News <onboarding@resend.dev>"),
         recipients_ui=_flag("RECIPIENTS_UI"),
+        pipeline_enabled=_flag("PIPELINE_ENABLED", default=True),
+        rag_enabled=_flag("RAG_ENABLED", default=True),
         base_url=_optional("BASE_URL", "http://localhost:8000").rstrip("/"),
         topics=topics,
         max_articles_per_topic=int(_optional("MAX_ARTICLES_PER_TOPIC", "4")),

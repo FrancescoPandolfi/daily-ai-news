@@ -27,6 +27,8 @@ MAX_QUESTION_CHARS = 500
 MAX_RECIPIENTS = 20
 ARTICLES_PER_PAGE = 20
 RAG_ERROR_MESSAGE = "Qualcosa è andato storto durante la ricerca. Riprova."
+PIPELINE_DISABLED_MESSAGE = "Raccolta disabilitata (PIPELINE_ENABLED=false)."
+RAG_DISABLED_MESSAGE = "Le domande sono disabilitate (RAG_ENABLED=false)."
 
 
 def _archive_page(topic: str | None, page: int) -> dict[str, Any]:
@@ -59,21 +61,26 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     scheduler = BackgroundScheduler(timezone=ZoneInfo(settings.timezone))
     application.state.scheduler = scheduler
     job_defaults: dict[str, Any] = {"coalesce": True, "misfire_grace_time": 3600, "max_instances": 1}
-    scheduler.add_job(
-        pipeline.run_pipeline,
-        CronTrigger(hour=settings.digest_hour, minute=settings.digest_minute),
-        kwargs={"trigger": "scheduler"},
-        id="daily_digest",
-        **job_defaults,
-    )
+    if settings.pipeline_enabled:
+        scheduler.add_job(
+            pipeline.run_pipeline,
+            CronTrigger(hour=settings.digest_hour, minute=settings.digest_minute),
+            kwargs={"trigger": "scheduler"},
+            id="daily_digest",
+            **job_defaults,
+        )
+        logger.info(
+            "Scheduler avviato: digest alle %02d:%02d (%s)",
+            settings.digest_hour,
+            settings.digest_minute,
+            settings.timezone,
+        )
+    else:
+        logger.info("Raccolta automatica disabilitata (PIPELINE_ENABLED=false)")
     scheduler.add_job(run_backup, CronTrigger(hour=3, minute=0), id="daily_backup", **job_defaults)
     scheduler.start()
-    logger.info(
-        "Scheduler avviato: digest alle %02d:%02d (%s)",
-        settings.digest_hour,
-        settings.digest_minute,
-        settings.timezone,
-    )
+    if not settings.rag_enabled:
+        logger.info("Domande RAG disabilitate (RAG_ENABLED=false)")
     try:
         yield
     finally:
@@ -114,6 +121,8 @@ def _page_context(
         "selected_topic": topic or "",
         "ask_topic": "",
         "running": pipeline.is_running(),
+        "pipeline_enabled": settings.pipeline_enabled,
+        "rag_enabled": settings.rag_enabled,
         "recipients_ui": settings.recipients_ui,
         "sandbox_sender": settings.email_from.lower().rstrip("> ").endswith("@resend.dev"),
         "recipients": storage.list_recipients(),
@@ -154,7 +163,9 @@ def ask(
 ) -> Response:
     question = question.strip()[:MAX_QUESTION_CHARS]
     extra: dict[str, Any] = {"question": question, "days": days, "ask_topic": topic}
-    if question:
+    if question and not settings.rag_enabled:
+        extra["error"] = RAG_DISABLED_MESSAGE
+    elif question:
         try:
             extra["result"] = rag.answer(question, topic=topic or None, days=days or None)
         except Exception:
@@ -201,6 +212,12 @@ def ask_stream(
     question = question.strip()[:MAX_QUESTION_CHARS]
     if not question:
         return Response("Domanda vuota", status_code=400)
+    if not settings.rag_enabled:
+        return StreamingResponse(
+            iter([_ndjson({"type": "error", "message": RAG_DISABLED_MESSAGE})]),
+            media_type="application/x-ndjson",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
     return StreamingResponse(
         _answer_events(question, topic or None, days or None),
         media_type="application/x-ndjson",
@@ -213,7 +230,9 @@ def ask_stream(
 
 @app.post("/run")
 def run_now(request: Request) -> Response:
-    if pipeline.is_running():
+    if not settings.pipeline_enabled:
+        message = PIPELINE_DISABLED_MESSAGE
+    elif pipeline.is_running():
         message = "La raccolta è già in corso."
     else:
         threading.Thread(

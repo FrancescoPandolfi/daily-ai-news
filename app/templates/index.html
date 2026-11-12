@@ -54,28 +54,29 @@
 </section>
 
 <form id="ask" class="ask" method="post" action="/ask">
-  <textarea name="question" rows="2" maxlength="500" required autofocus
-            placeholder="Chiedi qualcosa sulle notizie archiviate…">{{ '' if result else question }}</textarea>
+  <textarea name="question" rows="2" maxlength="500" required {{ 'autofocus' if rag_enabled }}
+            placeholder="{{ 'Domande disabilitate (RAG_ENABLED=false)' if not rag_enabled else 'Chiedi qualcosa sulle notizie archiviate…' }}"
+            {{ 'disabled' if not rag_enabled }}>{{ '' if result else question }}</textarea>
   <div class="ask-bar">
     <div class="pills">
-      <select class="pill" name="topic" aria-label="Argomento">
+      <select class="pill" name="topic" aria-label="Argomento" {{ 'disabled' if not rag_enabled }}>
         <option value="">Tutti gli argomenti</option>
         {% for t in topics %}<option value="{{ t }}" {{ 'selected' if t == ask_topic }}>{{ t }}</option>{% endfor %}
       </select>
-      <select class="pill" name="days" aria-label="Periodo">
+      <select class="pill" name="days" aria-label="Periodo" {{ 'disabled' if not rag_enabled }}>
         <option value="0" {{ 'selected' if days == 0 }}>Tutto il periodo</option>
         <option value="7" {{ 'selected' if days == 7 }}>Ultimi 7 giorni</option>
         <option value="30" {{ 'selected' if days == 30 }}>Ultimi 30 giorni</option>
         <option value="90" {{ 'selected' if days == 90 }}>Ultimi 90 giorni</option>
       </select>
     </div>
-    <button class="send" type="submit" aria-label="Invia">
+    <button class="send" type="submit" aria-label="Invia" {{ 'disabled' if not rag_enabled }}>
       <svg class="arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/></svg>
       <svg class="spin" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2a6 6 0 1 0 6 6" opacity=".9"/></svg>
     </button>
   </div>
 </form>
-<p class="hint">Invio per cercare · Maiusc+Invio per andare a capo</p>
+<p class="hint">{{ 'Le domande sono spente nel .env (RAG_ENABLED).' if not rag_enabled else 'Invio per cercare · Maiusc+Invio per andare a capo' }}</p>
 
 {% if flash and not flash_in_dialog %}<div class="notice">{{ flash }}</div>{% endif %}
 <div class="notice error" id="ask-error" role="alert" {{ 'hidden' if not error }}>{{ error }}</div>
@@ -90,9 +91,9 @@
 <div class="archive-head" id="archivio">
   <h2 class="section">Archivio</h2>
   <form method="post" action="/run">
-    <button class="btn" type="submit" {{ 'disabled' if running }}>
+    <button class="btn" type="submit" {{ 'disabled' if running or not pipeline_enabled }} title="{{ 'Disabilitata (PIPELINE_ENABLED=false)' if not pipeline_enabled else '' }}">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"/></svg>
-      {{ 'Raccolta in corso…' if running else 'Avvia raccolta' }}
+      {% if not pipeline_enabled %}Raccolta disabilitata{% elif running %}Raccolta in corso…{% else %}Avvia raccolta{% endif %}
     </button>
   </form>
 </div>
@@ -149,6 +150,7 @@
     var greetingEl = document.getElementById('greeting');
     var ERROR_TEXT = 'Qualcosa è andato storto durante la ricerca. Riprova.';
     var canStream = !!(window.fetch && window.ReadableStream && window.TextDecoder);
+    var ragEnabled = {{ 'true' if rag_enabled else 'false' }};
     var busy = false;
 
     function setBusy(value) {
@@ -257,6 +259,10 @@
     }
 
     form.addEventListener('submit', function (e) {
+      if (!ragEnabled) {
+        e.preventDefault();
+        return;
+      }
       if (!canStream) {  // senza streaming il form funziona come prima: pagina ricaricata
         form.classList.add('loading');
         sendButton.disabled = true;
@@ -268,7 +274,7 @@
     box.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
         e.preventDefault();
-        if (box.value.trim()) form.requestSubmit();
+        if (ragEnabled && box.value.trim()) form.requestSubmit();
       }
     });
     if (window.location.hash) {

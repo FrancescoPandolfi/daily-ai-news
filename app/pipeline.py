@@ -49,6 +49,9 @@ def run_pipeline(send_email: bool = True, trigger: TriggerKind = "scheduler") ->
     Restituisce il numero di articoli nuovi. Se la pipeline è già in esecuzione
     non fa nulla (evita doppi lanci da scheduler e pulsante manuale).
     """
+    if not get_settings().pipeline_enabled:
+        logger.info("Raccolta disabilitata (PIPELINE_ENABLED=false), salto")
+        return 0
     if not _lock.acquire(blocking=False):
         logger.info("Pipeline già in esecuzione, salto")
         return 0
